@@ -16,9 +16,15 @@
 <body>
   <h1>Jobsite Report Generator</h1>
   <div class="container">
+    <!-- Jobsite Info Fields -->
+    <div class="jobsite-info">
+      <input type="text" id="jobsite-name" placeholder="Jobsite Name">
+      <input type="text" id="technician-name" placeholder="Technician Name">
+      <input type="date" id="job-date">
+    </div>
+    <button id="add-entry">Add New Entry</button>
     <div id="entries"></div>
     <br>
-    <button id="add-entry">Add New Entry</button>
     <button id="generate-zip">Generate ZIP</button>
   </div>
 
@@ -105,18 +111,34 @@
       });
     });
 
-    // Generate ZIP including PDF and renamed photos (Steps 4 & 5)
+    // Generate ZIP including PDF and renamed photos
     document.getElementById("generate-zip").addEventListener("click", function() {
+      // Retrieve jobsite info values
+      const jobsiteName = document.getElementById("jobsite-name").value.trim() || "Jobsite";
+      const technicianName = document.getElementById("technician-name").value.trim() || "Technician";
+      const jobDate = document.getElementById("job-date").value.trim() || new Date().toISOString().slice(0,10);
+
+      // Create a PDF report using jsPDF
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
       doc.setFontSize(16);
       doc.text("Work Report", 10, 10);
       doc.setFontSize(12);
-      let startY = 20;
+      let currentY = 20;
+      doc.text("Jobsite Name: " + jobsiteName, 10, currentY);
+      currentY += 10;
+      doc.text("Technician Name: " + technicianName, 10, currentY);
+      currentY += 10;
+      doc.text("Date: " + jobDate, 10, currentY);
+      currentY += 10;
+      doc.text("------------------------------------------------", 10, currentY);
+      currentY += 10;
+      
+      // Create a table-like listing of each entry's number and description
       entriesData.forEach((entry, index) => {
         const line = (index + 1) + ": " + entry.description;
-        doc.text(line, 10, startY);
-        startY += 10;
+        doc.text(line, 10, currentY);
+        currentY += 10;
       });
       const pdfBlob = doc.output("blob");
 
@@ -138,15 +160,22 @@
         });
       });
 
+      // Use jobsite name and date for the zip filename (replace spaces with underscores)
+      const safeJobsite = jobsiteName.replace(/\s+/g, '_');
+      const zipFileName = `${safeJobsite}_${jobDate}.zip`;
+
       zip.generateAsync({ type: "blob" }).then(function(content) {
         const url = URL.createObjectURL(content);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "work_report.zip";
+        a.download = zipFileName;
         a.click();
         URL.revokeObjectURL(url);
       });
     });
   </script>
+<footer>
+  For use by svctex. Version 0.1.a
+</footer>
 </body>
 </html>
