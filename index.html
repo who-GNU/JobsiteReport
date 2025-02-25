@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Work Report Generator</title>
+  <!-- Include JSZip and jsPDF from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    .entry { border: 1px solid #ccc; padding: 10px; margin: 10px 0; }
+    .photo-list p { margin: 0.5em 0; }
+  </style>
+</head>
+<body>
+  <h1>Work Report Generator</h1>
+  <div id="entries"></div>
+  <br>
+  <button id="add-entry">Add New Entry</button>
+  <br>
+  <button id="generate-zip">Generate ZIP</button>
+
+  <script>
+    // Array to hold each entry's data
+    const entriesData = [];
+
+    // Add a new entry (Step 1)
+    document.getElementById("add-entry").addEventListener("click", function() {
+      const entryIndex = entriesData.length + 1;
+      // Create an object to store description and photos for this entry
+      const entryData = { description: "", photos: [] };
+      entriesData.push(entryData);
+
+      // Create a new entry block in the UI
+      const entryDiv = document.createElement("div");
+      entryDiv.className = "entry";
+      entryDiv.dataset.index = entryIndex;
+      entryDiv.innerHTML = `
+        <h3>Entry ${entryIndex}</h3>
+        <textarea class="description" placeholder="Enter description"></textarea><br>
+        <button class="add-photo">Add Photo</button>
+        <input type="file" class="photo-input" accept="image/*" style="display:none">
+        <div class="photo-list"></div>
+      `;
+      document.getElementById("entries").appendChild(entryDiv);
+
+      // When the description text changes, update the entry data
+      const descriptionInput = entryDiv.querySelector(".description");
+      descriptionInput.addEventListener("input", function() {
+        entryData.description = descriptionInput.value;
+      });
+
+      // Set up the Add Photo button and file input (Step 2)
+      const addPhotoBtn = entryDiv.querySelector(".add-photo");
+      const photoInput = entryDiv.querySelector(".photo-input");
+      const photoList = entryDiv.querySelector(".photo-list");
+
+      // When clicking "Add Photo", trigger the hidden file input
+      addPhotoBtn.addEventListener("click", function() {
+        photoInput.click();
+      });
+
+      // When a photo is selected, store it and update the UI with a label
+      photoInput.addEventListener("change", function() {
+        const file = photoInput.files[0];
+        if (file) {
+          // Determine letter label: A for first photo, B for second, etc.
+          const letter = String.fromCharCode(65 + entryData.photos.length);
+          entryData.photos.push(file);
+          // Label format: "n+X" (e.g. "1A" for the first photo of entry 1)
+          const label = entryIndex + letter;
+          const p = document.createElement("p");
+          p.textContent = "Photo: " + label + " (" + file.name + ")";
+          photoList.appendChild(p);
+        }
+        // Reset the file input value so the same file can be added again if needed.
+        photoInput.value = "";
+      });
+    });
+
+    // When "Generate ZIP" is clicked, create the PDF and package everything (Steps 4 & 5)
+    document.getElementById("generate-zip").addEventListener("click", function() {
+      // Create a PDF report using jsPDF
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text("Work Report", 10, 10);
+      doc.setFontSize(12);
+      let startY = 20;
+      // Create a table-like listing of each entry's number and description (Step 4)
+      entriesData.forEach((entry, index) => {
+        const line = (index + 1) + ": " + entry.description;
+        doc.text(line, 10, startY);
+        startY += 10;
+      });
+      // Convert the PDF to a blob for packaging
+      const pdfBlob = doc.output("blob");
+
+      // Create a new ZIP file using JSZip
+      const zip = new JSZip();
+      // Add the PDF to the ZIP
+      zip.file("report.pdf", pdfBlob);
+
+      // For each entry, add its photos with new names
+      entriesData.forEach((entry, index) => {
+        const entryNum = index + 1;
+        entry.photos.forEach((photoFile, photoIndex) => {
+          // Determine letter (A, B, C, …)
+          const letter = String.fromCharCode(65 + photoIndex);
+          let newName = entryNum + letter;
+          // Get the original file extension
+          const parts = photoFile.name.split(".");
+          if (parts.length > 1) {
+            const ext = parts.pop();
+            newName += "." + ext;
+          }
+          // Add the file to the zip using the new name
+          zip.file(newName, photoFile);
+        });
+      });
+
+      // Generate the ZIP file and trigger a download
+      zip.generateAsync({ type: "blob" }).then(function(content) {
+        const url = URL.createObjectURL(content);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "work_report.zip";
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    });
+  </script>
+</body>
+</html>
